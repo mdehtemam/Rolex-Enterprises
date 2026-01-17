@@ -33,19 +33,22 @@ export function Home({ onCategoryClick }: HomeProps) {
 
         const counts: Record<string, number> = {};
         
-        // Batch count queries for better performance
-        const countPromises = categoriesData.map(async (category) => {
-          const { count } = await supabase
-            .from('products')
-            .select('id', { count: 'exact', head: true })
-            .eq('category_id', category.id);
-          return { categoryId: category.id, count: count || 0 };
+        // Optimized: Get all products in one query
+        const { data: productData } = await supabase
+          .from('products')
+          .select('category_id', { count: 'exact' });
+        
+        categoriesData.forEach(category => {
+          counts[category.id] = 0;
         });
         
-        const results = await Promise.all(countPromises);
-        results.forEach(({ categoryId, count }) => {
-          counts[categoryId] = count;
-        });
+        if (productData) {
+          productData.forEach(item => {
+            if (item.category_id) {
+              counts[item.category_id] = (counts[item.category_id] || 0) + 1;
+            }
+          });
+        }
         
         setProductCounts(counts);
       }

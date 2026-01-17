@@ -11,41 +11,66 @@ export function CategoryProducts({ categoryId, onBack }: CategoryProductsProps) 
   const [category, setCategory] = useState<Category | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const productsPerPage = 12;
 
   useEffect(() => {
+    setPage(1);
     loadData();
-    // Reload when category changes
   }, [categoryId]);
+
+  useEffect(() => {
+    if (page > 1) {
+      loadProducts();
+    }
+  }, [page]);
 
   async function loadData() {
     setLoading(true);
     try {
-      // Get category
-      const categoryResponse = await supabase
+      // Get category - select only needed columns
+      const { data: categoryData } = await supabase
         .from('categories')
-        .select('*')
+        .select('id, name, icon, created_at')
         .eq('id', categoryId)
         .maybeSingle();
-      
-      const categoryData = await categoryResponse;
 
-      // Get products for this category
-      const productsResponse = await supabase
+      // Get total count
+      const { count } = await supabase
         .from('products')
-        .select('*')
-        .eq('category_id', categoryId)
-        .order('name');
+        .select('id', { count: 'exact', head: true })
+        .eq('category_id', categoryId);
 
-      const productsData = await productsResponse;
+      setCategory(categoryData);
+      setTotalProducts(count || 0);
 
-      setCategory(categoryData.data);
-      setProducts(productsData.data || []);
+      // Get first page
+      await loadProducts(1);
     } catch (error) {
       console.error('Error loading products:', error);
     } finally {
       setLoading(false);
     }
   }
+
+  async function loadProducts(pageNum: number = page) {
+    try {
+      const start = (pageNum - 1) * productsPerPage;
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, price, image_url, category_id')
+        .eq('category_id', categoryId)
+        .order('name')
+        .range(start, start + productsPerPage - 1);
+
+      setProducts(data || []);
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  }
+
+  const totalPages = Math.ceil(totalProducts / productsPerPage);
 
   if (loading) {
     return (
@@ -87,6 +112,7 @@ export function CategoryProducts({ categoryId, onBack }: CategoryProductsProps) 
                   src={product.image_url}
                   alt={product.name}
                   loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-contain p-2"
                 />
               </div>
@@ -102,6 +128,26 @@ export function CategoryProducts({ categoryId, onBack }: CategoryProductsProps) 
             </div>
           ))}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-8">
+            <button
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 rounded-lg bg-slate-200 text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-300 transition"
+            >
+              Previous
+            </button>
+            <span className="text-slate-600">Page {page} of {totalPages}</span>
+            <button
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 rounded-lg bg-slate-200 text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-300 transition"
+            >
+              Next
+            </button>
+          </div>
+        )}
       )}
     </div>
   );
