@@ -18,6 +18,7 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
     price: '',
     image_url: '',
     category_id: '',
+    sku: '',
   });
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
 
   function openAddModal() {
     setEditingProduct(null);
-    setFormData({ name: '', price: '', image_url: '', category_id: '' });
+    setFormData({ name: '', price: '', image_url: '', category_id: '', sku: '' });
     setShowModal(true);
   }
 
@@ -53,6 +54,7 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
       price: product.price.toString(),
       image_url: product.image_url,
       category_id: product.category_id,
+      sku: product.sku,
     });
     setShowModal(true);
   }
@@ -109,6 +111,7 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
             price: parseFloat(formData.price),
             image_url: formData.image_url,
             category_id: formData.category_id,
+            sku: formData.sku,
             updated_at: new Date().toISOString(),
           })
           .eq('id', editingProduct.id);
@@ -118,6 +121,7 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
           price: parseFloat(formData.price),
           image_url: formData.image_url,
           category_id: formData.category_id,
+          sku: formData.sku,
         });
       }
 
@@ -179,6 +183,7 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Image</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Name</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">SKU</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Category</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Price</th>
                 <th className="px-6 py-3 text-right text-sm font-semibold text-slate-700">Actions</th>
@@ -195,6 +200,7 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
                     />
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-slate-900">{product.name}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 font-mono">{product.sku}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">
                     {getCategoryName(product.category_id)}
                   </td>
@@ -243,6 +249,17 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">SKU</label>
+                  <input
+                    type="text"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    placeholder="e.g., ROLEX-001"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent"
                     required
                   />

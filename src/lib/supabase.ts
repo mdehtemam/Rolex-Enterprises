@@ -18,6 +18,7 @@ export interface Product {
   price: number;
   image_url: string;
   category_id: string;
+  sku: string;
   created_at: string;
   updated_at: string;
 }
