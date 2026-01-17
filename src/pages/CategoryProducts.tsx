@@ -14,24 +14,32 @@ export function CategoryProducts({ categoryId, onBack }: CategoryProductsProps) 
 
   useEffect(() => {
     loadData();
+    // Reload when category changes
   }, [categoryId]);
 
   async function loadData() {
+    setLoading(true);
     try {
-      const { data: categoryData } = await supabase
+      // Get category
+      const categoryResponse = await supabase
         .from('categories')
         .select('*')
         .eq('id', categoryId)
         .maybeSingle();
+      
+      const categoryData = await categoryResponse;
 
-      const { data: productsData } = await supabase
+      // Get products for this category
+      const productsResponse = await supabase
         .from('products')
         .select('*')
         .eq('category_id', categoryId)
         .order('name');
 
-      setCategory(categoryData);
-      setProducts(productsData || []);
+      const productsData = await productsResponse;
+
+      setCategory(categoryData.data);
+      setProducts(productsData.data || []);
     } catch (error) {
       console.error('Error loading products:', error);
     } finally {
@@ -68,22 +76,23 @@ export function CategoryProducts({ categoryId, onBack }: CategoryProductsProps) 
           <p className="text-slate-500">No products in this category yet.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {products.map((product) => (
             <div
               key={product.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow"
+              className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow"
             >
-              <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden">
+              <div className="aspect-[4/3] bg-slate-50 flex items-center justify-center overflow-hidden">
                 <img
                   src={product.image_url}
                   alt={product.name}
-                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  className="w-full h-full object-contain p-2"
                 />
               </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-slate-900 mb-2">{product.name}</h3>
-                <p className="text-2xl font-bold text-amber-600">
+              <div className="p-3">
+                <h3 className="font-semibold text-slate-900 mb-1 text-sm">{product.name}</h3>
+                <p className="text-lg font-bold text-amber-600">
                   ₹{parseFloat(product.price.toString()).toLocaleString('en-IN', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,

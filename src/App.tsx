@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, createContext, useContext } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
 import { Home } from './pages/Home';
@@ -9,9 +9,19 @@ import { ManageCategories } from './pages/ManageCategories';
 
 type View = 'home' | 'category' | 'admin-login' | 'manage-products' | 'manage-categories';
 
+interface RefreshContextType {
+  refreshKey: number;
+  triggerRefresh: () => void;
+}
+
+const RefreshContext = createContext<RefreshContextType>({ refreshKey: 0, triggerRefresh: () => {} });
+
+export const useRefresh = () => useContext(RefreshContext);
+
 function AppContent() {
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [refreshKey, setRefreshKey] = useState(0);
   const { isAdmin } = useAuth();
 
   function handleNavigate(view: string) {
@@ -31,22 +41,28 @@ function AppContent() {
     setCurrentView('manage-products');
   }
 
+  const triggerRefresh = () => {
+    setRefreshKey(k => k + 1);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Header currentView={currentView} onNavigate={handleNavigate} />
+    <RefreshContext.Provider value={{ refreshKey, triggerRefresh }}>
+      <div className="min-h-screen bg-slate-50">
+        <Header currentView={currentView} onNavigate={handleNavigate} />
 
-      {currentView === 'home' && <Home onCategoryClick={handleCategoryClick} />}
+        {currentView === 'home' && <Home key={refreshKey} onCategoryClick={handleCategoryClick} />}
 
-      {currentView === 'category' && (
-        <CategoryProducts categoryId={selectedCategoryId} onBack={() => setCurrentView('home')} />
-      )}
+        {currentView === 'category' && (
+          <CategoryProducts key={refreshKey + selectedCategoryId} categoryId={selectedCategoryId} onBack={() => setCurrentView('home')} />
+        )}
 
-      {currentView === 'admin-login' && <AdminLogin onLoginSuccess={handleAdminLoginSuccess} />}
+        {currentView === 'admin-login' && <AdminLogin onLoginSuccess={handleAdminLoginSuccess} />}
 
-      {currentView === 'manage-products' && isAdmin && <ManageProducts />}
+        {currentView === 'manage-products' && isAdmin && <ManageProducts onProductsAdded={triggerRefresh} />}
 
-      {currentView === 'manage-categories' && isAdmin && <ManageCategories />}
-    </div>
+        {currentView === 'manage-categories' && isAdmin && <ManageCategories onCategoriesChanged={triggerRefresh} />}
+      </div>
+    </RefreshContext.Provider>
   );
 }
 

@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, FolderOpen } from 'lucide-react';
 import { supabase, Category } from '../lib/supabase';
 
-export function ManageCategories() {
+interface ManageCategoriesProps {
+  onCategoriesChanged?: () => void;
+}
+
+export function ManageCategories({ onCategoriesChanged }: ManageCategoriesProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [productCounts, setProductCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -73,6 +77,7 @@ export function ManageCategories() {
       }
 
       setShowModal(false);
+      onCategoriesChanged?.();
       loadData();
     } catch (error) {
       console.error('Error saving category:', error);

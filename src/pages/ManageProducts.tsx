@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { supabase, Product, Category } from '../lib/supabase';
+import { useRefresh } from '../App';
 
-export function ManageProducts() {
+interface ManageProductsProps {
+  onProductsAdded?: () => void;
+}
+
+export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +57,46 @@ export function ManageProducts() {
     setShowModal(true);
   }
 
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Compress image before converting to base64
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Resize to max 800x600
+        const maxWidth = 800;
+        const maxHeight = 600;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to base64 with compression
+        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        setFormData({ ...formData, image_url: base64 });
+      };
+      
+      img.src = URL.createObjectURL(file);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -77,6 +122,7 @@ export function ManageProducts() {
       }
 
       setShowModal(false);
+      onProductsAdded?.();
       loadData();
     } catch (error) {
       console.error('Error saving product:', error);
@@ -230,16 +276,23 @@ export function ManageProducts() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Image URL
+                    Product Image
                   </label>
                   <input
-                    type="url"
-                    value={formData.image_url}
-                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent"
-                    placeholder="https://example.com/image.jpg"
-                    required
                   />
+                  {formData.image_url && (
+                    <div className="mt-3 w-full">
+                      <img
+                        src={formData.image_url}
+                        alt="Preview"
+                        className="w-full h-40 object-cover rounded-lg"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex gap-3 mt-6">

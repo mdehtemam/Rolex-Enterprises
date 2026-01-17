@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { ChevronRight, Backpack, ShoppingBag, Briefcase } from 'lucide-react';
 import { supabase, Category } from '../lib/supabase';
 
@@ -32,13 +32,21 @@ export function Home({ onCategoryClick }: HomeProps) {
         setCategories(categoriesData);
 
         const counts: Record<string, number> = {};
-        for (const category of categoriesData) {
+        
+        // Batch count queries for better performance
+        const countPromises = categoriesData.map(async (category) => {
           const { count } = await supabase
             .from('products')
-            .select('*', { count: 'exact', head: true })
+            .select('id', { count: 'exact', head: true })
             .eq('category_id', category.id);
-          counts[category.id] = count || 0;
-        }
+          return { categoryId: category.id, count: count || 0 };
+        });
+        
+        const results = await Promise.all(countPromises);
+        results.forEach(({ categoryId, count }) => {
+          counts[categoryId] = count;
+        });
+        
         setProductCounts(counts);
       }
     } catch (error) {
@@ -47,6 +55,8 @@ export function Home({ onCategoryClick }: HomeProps) {
       setLoading(false);
     }
   }
+
+  const memoizedCategories = useMemo(() => categories, [categories]);
 
   if (loading) {
     return (
@@ -64,7 +74,7 @@ export function Home({ onCategoryClick }: HomeProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {categories.map((category) => {
+        {memoizedCategories.map((category) => {
           const Icon = iconMap[category.icon] || ShoppingBag;
           const count = productCounts[category.id] || 0;
 
