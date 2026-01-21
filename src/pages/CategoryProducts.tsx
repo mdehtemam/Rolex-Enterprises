@@ -71,7 +71,7 @@ export function CategoryProducts({ categoryId, onBack }: CategoryProductsProps) 
       const start = (pageNum - 1) * productsPerPage;
       const { data } = await supabase
         .from('products')
-        .select('id, name, price, price_max, image_url, category_id, sku')
+        .select('id, name, price, image_url, category_id, sku')
         .eq('category_id', categoryId)
         .order('name')
         .range(start, start + productsPerPage - 1);
@@ -85,23 +85,6 @@ export function CategoryProducts({ categoryId, onBack }: CategoryProductsProps) 
   const totalPages = Math.ceil(totalProducts / productsPerPage);
   const displayedProducts = searchQuery ? filteredProducts : products;
   const displayedPages = Math.ceil(displayedProducts.length / productsPerPage);
-
-  const formatPrice = (p: Product) => {
-    const min = p.price;
-    const max = p.price_max;
-    const formattedMin = `₹${parseFloat(min.toString()).toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-    if (max !== null && max !== undefined && !Number.isNaN(max) && max !== min) {
-      const formattedMax = `₹${parseFloat(max.toString()).toLocaleString('en-IN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`;
-      return `${formattedMin} – ${formattedMax}`;
-    }
-    return formattedMin;
-  };
 
   if (loading) {
     return (
@@ -168,7 +151,12 @@ export function CategoryProducts({ categoryId, onBack }: CategoryProductsProps) 
                 <div className="p-3">
                   <h3 className="font-semibold text-slate-900 mb-1 text-sm">{product.name}</h3>
                   <p className="text-xs text-slate-500 mb-2 font-mono">SKU: {product.sku}</p>
-                  <p className="text-lg font-bold text-amber-600">{formatPrice(product)}</p>
+                  <p className="text-lg font-bold text-amber-600">
+                    ₹{parseFloat(product.price.toString()).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                  })}
+                </p>
               </div>
             </div>
           ))}

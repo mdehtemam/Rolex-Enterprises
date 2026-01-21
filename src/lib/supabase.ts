@@ -16,7 +16,6 @@ export interface Product {
   id: string;
   name: string;
   price: number;
-  price_max?: number | null;
   image_url: string;
   category_id: string;
   sku: string;
