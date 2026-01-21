@@ -16,6 +16,7 @@ type ProductSearchResult = {
   id: string;
   name: string;
   price: number;
+  price_max: number | null;
   image_url: string;
   category_id: string;
   sku: string;
@@ -99,7 +100,7 @@ export function Home({ onCategoryClick }: HomeProps) {
         // Note: requires `sku` stored in consistent casing OR Postgres can handle ilike.
         const { data, error } = await supabase
           .from('products')
-          .select('id, name, price, image_url, category_id, sku, categories(name)')
+          .select('id, name, price, price_max, image_url, category_id, sku, categories(name)')
           .ilike('sku', normalized)
           .maybeSingle();
 
@@ -129,6 +130,22 @@ export function Home({ onCategoryClick }: HomeProps) {
   }, [skuQuery]);
 
   const memoizedCategories = useMemo(() => categories, [categories]);
+  const formatPrice = (p: Pick<ProductSearchResult, 'price' | 'price_max'>) => {
+    const min = p.price;
+    const max = p.price_max;
+    const formattedMin = `₹${parseFloat(min.toString()).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+    if (max !== null && max !== undefined && !Number.isNaN(max) && max !== min) {
+      const formattedMax = `₹${parseFloat(max.toString()).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+      return `${formattedMin} – ${formattedMax}`;
+    }
+    return formattedMin;
+  };
 
   if (loading) {
     return (
@@ -196,10 +213,7 @@ export function Home({ onCategoryClick }: HomeProps) {
                         <div className="text-right shrink-0">
                           <div className="text-xs text-slate-500">Price</div>
                           <div className="text-2xl font-bold text-amber-600">
-                            ₹{parseFloat(skuResult.price.toString()).toLocaleString('en-IN', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
+                            {formatPrice(skuResult)}
                           </div>
                         </div>
                       </div>

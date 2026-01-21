@@ -54,3 +54,7 @@ CREATE POLICY "Allow authenticated delete categories" ON categories FOR DELETE U
 CREATE POLICY "Allow authenticated insert products" ON products FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow authenticated update products" ON products FOR UPDATE USING (true);
 CREATE POLICY "Allow authenticated delete products" ON products FOR DELETE USING (true);
+
+-- Add optional max price column for price ranges (safe to run multiple times)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS price_max DECIMAL;
+UPDATE products SET price_max = price WHERE price_max IS NULL;

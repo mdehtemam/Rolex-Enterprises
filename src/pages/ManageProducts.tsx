@@ -15,7 +15,8 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    price: '',
+    priceMin: '',
+    priceMax: '',
     image_url: '',
     category_id: '',
     sku: '',
@@ -43,7 +44,7 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
 
   function openAddModal() {
     setEditingProduct(null);
-    setFormData({ name: '', price: '', image_url: '', category_id: '', sku: '' });
+    setFormData({ name: '', priceMin: '', priceMax: '', image_url: '', category_id: '', sku: '' });
     setShowModal(true);
   }
 
@@ -51,7 +52,8 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
     setEditingProduct(product);
     setFormData({
       name: product.name,
-      price: product.price.toString(),
+      priceMin: product.price.toString(),
+      priceMax: product.price_max != null ? product.price_max.toString() : '',
       image_url: product.image_url,
       category_id: product.category_id,
       sku: product.sku,
@@ -103,12 +105,26 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
     e.preventDefault();
 
     try {
+      const price = parseFloat(formData.priceMin);
+      const price_max = formData.priceMax.trim() ? parseFloat(formData.priceMax) : null;
+
+      if (Number.isNaN(price)) {
+        alert('Please enter a valid minimum price.');
+        return;
+      }
+
+      if (price_max !== null && (Number.isNaN(price_max) || price_max < price)) {
+        alert('Maximum price must be a number greater than or equal to minimum price.');
+        return;
+      }
+
       if (editingProduct) {
         await supabase
           .from('products')
           .update({
             name: formData.name,
-            price: parseFloat(formData.price),
+            price,
+            price_max,
             image_url: formData.image_url,
             category_id: formData.category_id,
             sku: formData.sku,
@@ -118,7 +134,8 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
       } else {
         await supabase.from('products').insert({
           name: formData.name,
-          price: parseFloat(formData.price),
+          price,
+          price_max,
           image_url: formData.image_url,
           category_id: formData.category_id,
           sku: formData.sku,
@@ -146,6 +163,23 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
 
   function getCategoryName(categoryId: string) {
     return categories.find((c) => c.id === categoryId)?.name || 'Unknown';
+  }
+
+  function formatPrice(p: Product) {
+    const min = p.price;
+    const max = p.price_max;
+    const formattedMin = `₹${parseFloat(min.toString()).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+    if (max !== null && max !== undefined && !Number.isNaN(max) && max !== min) {
+      const formattedMax = `₹${parseFloat(max.toString()).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+      return `${formattedMin} – ${formattedMax}`;
+    }
+    return formattedMin;
   }
 
   if (loading) {
@@ -205,10 +239,7 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
                     {getCategoryName(product.category_id)}
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-amber-600">
-                    ₹{parseFloat(product.price.toString()).toLocaleString('en-IN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatPrice(product)}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -281,15 +312,27 @@ export function ManageProducts({ onProductsAdded }: ManageProductsProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Price</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent"
-                    required
-                  />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Price (range allowed)</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.priceMin}
+                      onChange={(e) => setFormData({ ...formData, priceMin: e.target.value })}
+                      placeholder="Min price (required)"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent"
+                      required
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.priceMax}
+                      onChange={(e) => setFormData({ ...formData, priceMax: e.target.value })}
+                      placeholder="Max price (optional)"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">Leave max blank for a single fixed price.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
