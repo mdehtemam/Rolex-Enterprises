@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Backpack, ShoppingBag, Briefcase } from 'lucide-react';
 import { supabase, Category } from '../lib/supabase';
 
@@ -30,6 +30,7 @@ export function Home({ onCategoryClick }: HomeProps) {
   const [skuSearching, setSkuSearching] = useState(false);
   const [skuError, setSkuError] = useState<string>('');
   const [skuResult, setSkuResult] = useState<ProductSearchResult | null>(null);
+  const skuSearchSeq = useRef(0);
 
   useEffect(() => {
     loadCategories();
@@ -73,40 +74,59 @@ export function Home({ onCategoryClick }: HomeProps) {
     }
   }
 
-  async function searchBySku(e: React.FormEvent) {
-    e.preventDefault();
+  useEffect(() => {
     const trimmed = skuQuery.trim();
-    setSkuError('');
-    setSkuResult(null);
 
-    if (!trimmed) return;
-
-    setSkuSearching(true);
-    try {
-      const normalized = trimmed.toUpperCase();
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, price, image_url, category_id, sku, categories(name)')
-        .eq('sku', normalized)
-        .maybeSingle();
-
-      if (error) {
-        setSkuError(error.message);
-        return;
-      }
-
-      if (!data) {
-        setSkuError('No product found for that SKU.');
-        return;
-      }
-
-      setSkuResult(data as ProductSearchResult);
-    } catch (err) {
-      setSkuError(err instanceof Error ? err.message : 'Something went wrong searching by SKU.');
-    } finally {
+    // Clear results when input is cleared
+    if (!trimmed) {
       setSkuSearching(false);
+      setSkuError('');
+      setSkuResult(null);
+      return;
     }
-  }
+
+    // Debounce to avoid spamming requests while typing
+    const timeout = setTimeout(async () => {
+      const seq = ++skuSearchSeq.current;
+      setSkuSearching(true);
+      setSkuError('');
+      setSkuResult(null);
+
+      try {
+        const normalized = trimmed.toUpperCase();
+
+        // Case-insensitive match by normalizing both sides.
+        // Note: requires `sku` stored in consistent casing OR Postgres can handle ilike.
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, price, image_url, category_id, sku, categories(name)')
+          .ilike('sku', normalized)
+          .maybeSingle();
+
+        // Ignore out-of-order responses
+        if (seq !== skuSearchSeq.current) return;
+
+        if (error) {
+          setSkuError(error.message);
+          return;
+        }
+
+        if (!data) {
+          setSkuError('No product found for that SKU.');
+          return;
+        }
+
+        setSkuResult(data as ProductSearchResult);
+      } catch (err) {
+        if (seq !== skuSearchSeq.current) return;
+        setSkuError(err instanceof Error ? err.message : 'Something went wrong searching by SKU.');
+      } finally {
+        if (seq === skuSearchSeq.current) setSkuSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [skuQuery]);
 
   const memoizedCategories = useMemo(() => categories, [categories]);
 
@@ -131,7 +151,7 @@ export function Home({ onCategoryClick }: HomeProps) {
           <h3 className="text-lg font-semibold text-slate-900 mb-1">Quick SKU Search</h3>
           <p className="text-sm text-slate-600 mb-4">Enter a SKU to instantly view the product price.</p>
 
-          <form onSubmit={searchBySku} className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
               value={skuQuery}
@@ -139,14 +159,10 @@ export function Home({ onCategoryClick }: HomeProps) {
               placeholder="e.g., ROLEX-001"
               className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent font-mono"
             />
-            <button
-              type="submit"
-              disabled={skuSearching || !skuQuery.trim()}
-              className="px-5 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {skuSearching ? 'Searching...' : 'Search'}
-            </button>
-          </form>
+            <div className="sm:w-32 flex items-center justify-start sm:justify-end text-sm text-slate-500">
+              {skuSearching ? 'Searching…' : ' '}
+            </div>
+          </div>
 
           {(skuError || skuResult) && (
             <div className="mt-4">
