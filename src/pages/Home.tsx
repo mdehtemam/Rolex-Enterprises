@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Backpack, ShoppingBag, Briefcase } from 'lucide-react';
 import { supabase, Category } from '../lib/supabase';
 
@@ -12,10 +12,24 @@ const iconMap: Record<string, any> = {
   briefcase: Briefcase,
 };
 
+type ProductSearchResult = {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string;
+  category_id: string;
+  sku: string;
+  categories?: { name: string } | null;
+};
+
 export function Home({ onCategoryClick }: HomeProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [productCounts, setProductCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [skuQuery, setSkuQuery] = useState('');
+  const [skuSearching, setSkuSearching] = useState(false);
+  const [skuError, setSkuError] = useState<string>('');
+  const [skuResult, setSkuResult] = useState<ProductSearchResult | null>(null);
 
   useEffect(() => {
     loadCategories();
@@ -59,6 +73,41 @@ export function Home({ onCategoryClick }: HomeProps) {
     }
   }
 
+  async function searchBySku(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = skuQuery.trim();
+    setSkuError('');
+    setSkuResult(null);
+
+    if (!trimmed) return;
+
+    setSkuSearching(true);
+    try {
+      const normalized = trimmed.toUpperCase();
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, price, image_url, category_id, sku, categories(name)')
+        .eq('sku', normalized)
+        .maybeSingle();
+
+      if (error) {
+        setSkuError(error.message);
+        return;
+      }
+
+      if (!data) {
+        setSkuError('No product found for that SKU.');
+        return;
+      }
+
+      setSkuResult(data as ProductSearchResult);
+    } catch (err) {
+      setSkuError(err instanceof Error ? err.message : 'Something went wrong searching by SKU.');
+    } finally {
+      setSkuSearching(false);
+    }
+  }
+
   const memoizedCategories = useMemo(() => categories, [categories]);
 
   if (loading) {
@@ -74,6 +123,97 @@ export function Home({ onCategoryClick }: HomeProps) {
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-slate-900 mb-2">Product Categories</h2>
         <p className="text-slate-600">Select a category to view products and prices</p>
+      </div>
+
+      {/* Quick SKU Search */}
+      <div className="mb-8">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-1">Quick SKU Search</h3>
+          <p className="text-sm text-slate-600 mb-4">Enter a SKU to instantly view the product price.</p>
+
+          <form onSubmit={searchBySku} className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              value={skuQuery}
+              onChange={(e) => setSkuQuery(e.target.value)}
+              placeholder="e.g., ROLEX-001"
+              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent font-mono"
+            />
+            <button
+              type="submit"
+              disabled={skuSearching || !skuQuery.trim()}
+              className="px-5 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {skuSearching ? 'Searching...' : 'Search'}
+            </button>
+          </form>
+
+          {(skuError || skuResult) && (
+            <div className="mt-4">
+              {skuError && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm">
+                  {skuError}
+                </div>
+              )}
+
+              {skuResult && (
+                <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+                  <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-4 p-4">
+                    <div className="aspect-[4/3] bg-white rounded-lg border border-slate-200 overflow-hidden flex items-center justify-center">
+                      <img
+                        src={skuResult.image_url}
+                        alt={skuResult.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-contain p-2"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-slate-900 truncate">{skuResult.name}</h4>
+                          <p className="text-xs text-slate-600 font-mono mt-1">SKU: {skuResult.sku}</p>
+                          {skuResult.categories?.name && (
+                            <p className="text-xs text-slate-500 mt-1">Category: {skuResult.categories.name}</p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-xs text-slate-500">Price</div>
+                          <div className="text-2xl font-bold text-amber-600">
+                            ₹{parseFloat(skuResult.price.toString()).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onCategoryClick(skuResult.category_id)}
+                          className="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-100 transition text-sm"
+                        >
+                          Open category
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSkuQuery('');
+                            setSkuResult(null);
+                            setSkuError('');
+                          }}
+                          className="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-100 transition text-sm"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
